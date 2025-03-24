@@ -10,9 +10,6 @@ df["size"] = pd.to_numeric(df["size"], errors="coerce")
 df["time"] = pd.to_numeric(df["time"], errors="coerce")
 df = df.dropna()
 
-# Średni czas dla (filename, size, threads)
-pivot = df.pivot_table(index=["size"], columns="threads", values="time", aggfunc="mean")
-
 # --- WYKRES CZASU vs LICZBA WĄTKÓW ---
 plt.figure()
 for size in sorted(df["size"].unique()):

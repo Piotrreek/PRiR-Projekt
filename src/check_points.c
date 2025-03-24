@@ -14,15 +14,13 @@ double f(double x, Coeffs coeffs) {
     return coeffs.a*x*x*x + coeffs.b*x*x + coeffs.c*x + coeffs.d;
 }
 
-int count_valid_points(const char* filename, Coeffs coeffs, int threads) {
+int count_valid_points(const char* filename, Coeffs coeffs, int threads, double* xs, double* ys) {
     FILE* file = fopen(filename, "r");
     if (!file) {
         perror("Nie można otworzyć pliku");
         return -1;
     }
 
-    double* xs = malloc(sizeof(double) * 64000000);
-    double* ys = malloc(sizeof(double) * 64000000);
     int count = 0;
 
     while (fscanf(file, "%lf,%lf", &xs[count], &ys[count]) == 2) {
@@ -45,14 +43,12 @@ int count_valid_points(const char* filename, Coeffs coeffs, int threads) {
     }
 
     double end = omp_get_wtime();
-    printf("Threads: %d | File: %s | Matches: %d / %d | Time: %f sec\n", threads, filename, match_count, count, end - start);
+    printf("Threads: %d | File: %s | Matches: %d / %d | Time: %lf sec\n", threads, filename, match_count, count, end - start);
 
     FILE* result = fopen("results.csv", "a");
-    fprintf(result, "%d,%d,%f\n", threads, count, end - start);
+    fprintf(result, "%d,%d,%lf\n", threads, count, end - start);
     fclose(result);
 
-    free(xs);
-    free(ys);
     return match_count;
 }
 
@@ -79,18 +75,25 @@ int main() {
 
     int size;
     // Lista liczby wątków do testowania
-    int thread_counts[] = {1, 2, 4, 8, 12};
+    int thread_counts[] = {1, 2, 4, 8};
     int num_threads = sizeof(thread_counts) / sizeof(thread_counts[0]);
+
+    // Max size of points list
+    double* xs = malloc(sizeof(double) * 64000000);
+    double* ys = malloc(sizeof(double) * 64000000);
 
     while (fscanf(sizes_file, "%d", &size) == 1) {
         char filename[100];
         sprintf(filename, "point_lists/points_%d.txt", size);
 
         for (int i = 0; i < num_threads; i++) {
-            count_valid_points(filename, coeffs, thread_counts[i]);
+            count_valid_points(filename, coeffs, thread_counts[i], xs, ys);
         }
     }
 
     fclose(sizes_file);
+    free(xs);
+    free(ys);
+
     return 0;
 }

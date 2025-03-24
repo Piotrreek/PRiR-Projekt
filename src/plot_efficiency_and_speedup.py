@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Tylko te wątki są używane w C
-used_threads = [1, 2, 4, 8, 12]
+used_threads = [1, 2, 4, 8]
 
 # Wczytaj dane z results.csv
 df = pd.read_csv("results.csv", names=["threads", "size", "time"])
