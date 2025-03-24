@@ -8,7 +8,7 @@ def main():
     # Set up command-line argument parsing
     parser = argparse.ArgumentParser(description="Plot speedup and efficiency graphs from results file")
     parser.add_argument("results_file", help="Path to the results CSV file")
-    parser.add_argument("--units", "-u", type=int, nargs="+", default=[1, 2, 4, 8, 12, 16],
+    parser.add_argument("--units", "-u", type=int, nargs="+", default=[1, 2, 4, 8],
                         help="Parallel unit numbers to include in the analysis (default: 1 2 4 8)")
     parser.add_argument("--prefix", help="Prefix for output filenames", default="")
     parser.add_argument("--suffix", help="Suffix for output filenames", default="")

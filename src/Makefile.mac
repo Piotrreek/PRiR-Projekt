@@ -36,12 +36,12 @@ clean:
 benchmark: omp mpi
 	@rm -f out/results.opm.csv out/results.mpi.csv
 	@echo "Running OpenMP benchmark..."
-	@for i in 1 2 4 8 12 16; do \
+	@for i in 1 2 4 8; do \
 		echo "  Running with $$i threads..."; \
 		./$(TARGET_OMP) $$i; \
 	done
 	@echo "\nRunning MPI benchmark..."
-	@for i in 1 2 4 8 12 16; do \
+	@for i in 1 2 4 8; do \
 		echo "  Running with $$i processes..."; \
 		mpirun -np $$i ./$(TARGET_MPI); \
 	done

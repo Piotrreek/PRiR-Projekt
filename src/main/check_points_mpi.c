@@ -35,7 +35,7 @@ void process_file(const char *filename, Coeffs coeffs)
         FILE *file = fopen(filename, "r");
         if (!file)
         {
-            perror("Nie można otworzyć pliku");
+            perror("Cannot open file");
             MPI_Abort(MPI_COMM_WORLD, 1);
             return;
         }
@@ -88,7 +88,10 @@ void process_file(const char *filename, Coeffs coeffs)
     MPI_Scatterv(all_xs, counts, displs, MPI_DOUBLE, local_xs, local_count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     MPI_Scatterv(all_ys, counts, displs, MPI_DOUBLE, local_ys, local_count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-    // Start timing
+    // Synchronize all processes before timing computation
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    // Start timing - ONLY measuring computation time
     double start_time = MPI_Wtime();
 
     // Process local points
@@ -102,19 +105,23 @@ void process_file(const char *filename, Coeffs coeffs)
         }
     }
 
-    // Reduce match count
+    // End computation timing
+    double end_time = MPI_Wtime();
+    double computation_time = end_time - start_time;
+
+    // Collect computation times from all processes
+    double max_time;
+    MPI_Reduce(&computation_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+
+    // Now, after timing, reduce the match count
     int total_matches;
     MPI_Reduce(&local_matches, &total_matches, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-
-    // End timing
-    double end_time = MPI_Wtime();
-    double elapsed = end_time - start_time;
 
     // Root process handles output
     if (rank == 0)
     {
-        printf("Processes: %d | File: %s | Matches: %d / %d | Time: %lf sec\n",
-               size, filename, total_matches, total_count, elapsed);
+        printf("Processes: %d | File: %s | Matches: %d / %d | Computation Time: %lf sec\n",
+               size, filename, total_matches, total_count, max_time);
 
         // Ensure output directory exists
         struct stat st = {0};
@@ -124,7 +131,7 @@ void process_file(const char *filename, Coeffs coeffs)
         }
 
         FILE *result = fopen("out/results.mpi.csv", "a");
-        fprintf(result, "%d,%d,%lf\n", size, total_count, elapsed);
+        fprintf(result, "%d,%d,%lf\n", size, total_count, max_time);
         fclose(result);
 
         // Free root's arrays
@@ -163,7 +170,7 @@ int main(int argc, char *argv[])
         FILE *coeff_file = fopen("point_lists/coeffs.json", "r");
         if (!coeff_file)
         {
-            perror("Brak pliku coeffs.json");
+            perror("Missing coeffs.json file");
             MPI_Abort(MPI_COMM_WORLD, 1);
             return 1;
         }
@@ -182,7 +189,7 @@ int main(int argc, char *argv[])
         FILE *sizes_file = fopen("point_lists/sizes.txt", "r");
         if (!sizes_file)
         {
-            perror("Brak pliku sizes.txt");
+            perror("Missing sizes.txt file");
             MPI_Abort(MPI_COMM_WORLD, 1);
             return 1;
         }
@@ -198,6 +205,9 @@ int main(int argc, char *argv[])
 
             // Process file with all available processes
             process_file(filename, coeffs);
+
+            // Add barrier to ensure clean separation between file processing
+            MPI_Barrier(MPI_COMM_WORLD);
         }
 
         // Broadcast -1 to signal the end
@@ -223,6 +233,9 @@ int main(int argc, char *argv[])
 
             // Process file with all available processes
             process_file(filename, coeffs);
+
+            // Match the barrier in the root process
+            MPI_Barrier(MPI_COMM_WORLD);
         }
     }
 
