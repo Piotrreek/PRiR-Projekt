@@ -1,0 +1,50 @@
+# Compiler settings for OpenMP version
+CC_OMP=clang
+CFLAGS_OMP=-Xpreprocessor -fopenmp -O2 -Wall -I/opt/homebrew/Cellar/libomp/20.1.1/include
+LDFLAGS_OMP=-L/opt/homebrew/Cellar/libomp/20.1.1/lib -lomp -lm
+
+# Compiler settings for MPI version
+CC_MPI=mpicc
+CFLAGS_MPI=-O2 -Wall -I/opt/homebrew/Cellar/mpich/4.3.0/include
+LDFLAGS_MPI=-L/opt/homebrew/Cellar/mpich/4.3.0/lib -lm
+
+TARGET_OMP=out/check_points_openmp
+TARGET_MPI=out/check_points_mpi
+
+SRC_OMP=main/check_points_openmp.c
+SRC_MPI=main/check_points_mpi.c
+
+all: omp mpi
+
+omp: $(TARGET_OMP)
+
+$(TARGET_OMP): $(SRC_OMP) | out
+	$(CC_OMP) $(CFLAGS_OMP) $^ -o $@ $(LDFLAGS_OMP)
+
+mpi: $(TARGET_MPI)
+
+$(TARGET_MPI): $(SRC_MPI) | out
+	$(CC_MPI) $(CFLAGS_MPI) $^ -o $@ $(LDFLAGS_MPI)
+
+out:
+	mkdir -p out
+
+clean:
+	rm -f $(TARGET_OMP) $(TARGET_MPI) out/results.csv
+
+# All
+benchmark: omp mpi
+	@rm -f out/results.opm.csv out/results.mpi.csv
+	@echo "Running OpenMP benchmark..."
+	@for i in 1 2 4 8 12 16; do \
+		echo "  Running with $$i threads..."; \
+		./$(TARGET_OMP) $$i; \
+	done
+	@echo "\nRunning MPI benchmark..."
+	@for i in 1 2 4 8 12 16; do \
+		echo "  Running with $$i processes..."; \
+		mpirun -np $$i ./$(TARGET_MPI); \
+	done
+	@echo "\nAll benchmarks completed. Results in out/results.opm.csv and out/results.mpi.csv"
+
+.PHONY: all omp mpi clean run-omp-1 run-omp-2 run-omp-4 run-omp-8 run-omp-all run-mpi-1 run-mpi-2 run-mpi-4 run-mpi-8 run-mpi-all benchmark

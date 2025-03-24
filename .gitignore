@@ -3,3 +3,9 @@
 *.exe
 *.txt
 *.json
+
+.vscode
+.venv/
+
+point_lists/
+out/
