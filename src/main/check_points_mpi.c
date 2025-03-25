@@ -11,12 +11,12 @@
 
 typedef struct
 {
-    double a, b, c, d;
+    double a, b, c, d, e, f;
 } Coeffs;
 
 double f(double x, Coeffs coeffs)
 {
-    return coeffs.a * x * x * x + coeffs.b * x * x + coeffs.c * x + coeffs.d;
+    return coeffs.a * x * x * x * x * x + coeffs.b * x * x * x * x + coeffs.c * x * x * x + coeffs.d * x * x + coeffs.e * x + coeffs.f;
 }
 
 void process_file(const char *filename, Coeffs coeffs)
@@ -123,13 +123,6 @@ void process_file(const char *filename, Coeffs coeffs)
         printf("Processes: %d | File: %s | Matches: %d / %d | Computation Time: %lf sec\n",
                size, filename, total_matches, total_count, max_time);
 
-        // Ensure output directory exists
-        struct stat st = {0};
-        if (stat("out", &st) == -1)
-        {
-            mkdir("out", 0777);
-        }
-
         FILE *result = fopen("out/results.mpi.csv", "a");
         fprintf(result, "%d,%d,%lf\n", size, total_count, max_time);
         fclose(result);
@@ -160,14 +153,7 @@ int main(int argc, char *argv[])
     // Root process reads coefficients
     if (rank == 0)
     {
-        // Ensure output directory exists
-        struct stat st = {0};
-        if (stat("out", &st) == -1)
-        {
-            mkdir("out", 0777);
-        }
-
-        FILE *coeff_file = fopen("point_lists/coeffs.json", "r");
+        FILE *coeff_file = fopen("points/point_lists/coeffs.json", "r");
         if (!coeff_file)
         {
             perror("Missing coeffs.json file");
@@ -175,18 +161,17 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-        fscanf(coeff_file, "{ \"a\": %lf, \"b\": %lf, \"c\": %lf, \"d\": %lf }",
-               &coeffs.a, &coeffs.b, &coeffs.c, &coeffs.d);
+        fscanf(coeff_file, "{ \"a\": %lf, \"b\": %lf, \"c\": %lf, \"d\": %lf, \"e\": %lf, \"f\": %lf }", &coeffs.a, &coeffs.b, &coeffs.c, &coeffs.d, &coeffs.e, &coeffs.f);
         fclose(coeff_file);
     }
 
     // Broadcast coefficients to all processes
-    MPI_Bcast(&coeffs, 4, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&coeffs, 6, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     // Root process reads sizes and broadcasts each size
     if (rank == 0)
     {
-        FILE *sizes_file = fopen("point_lists/sizes.txt", "r");
+        FILE *sizes_file = fopen("points/point_lists/sizes.txt", "r");
         if (!sizes_file)
         {
             perror("Missing sizes.txt file");
@@ -201,7 +186,7 @@ int main(int argc, char *argv[])
             MPI_Bcast(&file_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
             char filename[100];
-            sprintf(filename, "point_lists/points_%d.txt", file_size);
+            sprintf(filename, "points/point_lists/points_%d.txt", file_size);
 
             // Process file with all available processes
             process_file(filename, coeffs);
@@ -229,7 +214,7 @@ int main(int argc, char *argv[])
                 break;
 
             char filename[100];
-            sprintf(filename, "point_lists/points_%d.txt", file_size);
+            sprintf(filename, "points/point_lists/points_%d.txt", file_size);
 
             // Process file with all available processes
             process_file(filename, coeffs);

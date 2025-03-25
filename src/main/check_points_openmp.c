@@ -11,12 +11,12 @@
 
 typedef struct
 {
-    double a, b, c, d;
+    double a, b, c, d, e, f;
 } Coeffs;
 
 double f(double x, Coeffs coeffs)
 {
-    return coeffs.a * x * x * x + coeffs.b * x * x + coeffs.c * x + coeffs.d;
+    return coeffs.a * x * x * x * x * x + coeffs.b * x * x * x * x + coeffs.c * x * x * x + coeffs.d * x * x + coeffs.e * x + coeffs.f;
 }
 
 int count_valid_points(const char *filename, Coeffs coeffs, int threads, double *xs, double *ys)
@@ -81,14 +81,7 @@ int main(int argc, char *argv[])
         printf("No thread count specified. Using 1 thread.\n");
     }
 
-    // Create output directory if it doesn't exist
-    struct stat st = {0};
-    if (stat("out", &st) == -1)
-    {
-        mkdir("out", 0777);
-    }
-
-    FILE *coeff_file = fopen("point_lists/coeffs.json", "r");
+    FILE *coeff_file = fopen("points/point_lists/coeffs.json", "r");
     if (!coeff_file)
     {
         perror("Brak pliku coeffs.json");
@@ -96,10 +89,10 @@ int main(int argc, char *argv[])
     }
 
     Coeffs coeffs;
-    fscanf(coeff_file, "{ \"a\": %lf, \"b\": %lf, \"c\": %lf, \"d\": %lf }", &coeffs.a, &coeffs.b, &coeffs.c, &coeffs.d);
+    fscanf(coeff_file, "{ \"a\": %lf, \"b\": %lf, \"c\": %lf, \"d\": %lf, \"e\": %lf, \"f\": %lf }", &coeffs.a, &coeffs.b, &coeffs.c, &coeffs.d, &coeffs.e, &coeffs.f);
     fclose(coeff_file);
 
-    FILE *sizes_file = fopen("point_lists/sizes.txt", "r");
+    FILE *sizes_file = fopen("points/point_lists/sizes.txt", "r");
     if (!sizes_file)
     {
         perror("Brak pliku sizes.txt");
@@ -115,7 +108,7 @@ int main(int argc, char *argv[])
     while (fscanf(sizes_file, "%d", &size) == 1)
     {
         char filename[100];
-        sprintf(filename, "point_lists/points_%d.txt", size);
+        sprintf(filename, "points/point_lists/points_%d.txt", size);
 
         // Process the file with specified thread count
         count_valid_points(filename, coeffs, thread_count, xs, ys);

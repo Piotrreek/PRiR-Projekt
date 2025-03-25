@@ -6,11 +6,11 @@ list_sizes = [4000000, 8000000, 16000000, 32000000, 64000000]
 output_dir = "point_lists"
 os.makedirs(output_dir, exist_ok=True)
 
-# f(x) = ax^3 + bx^2 + cx + d
-coeffs = {'a': 1, 'b': -2, 'c': 3, 'd': -4}
+# f(x) = ax^5 + bx^4 + cx^3 + dx^2 + ex + f
+coeffs = {'a': 10, 'b': -2, 'c': 17, 'd': -4, 'e': 5, 'f': 1634534}
 
 def f(x, coeffs):
-    return coeffs['a'] * x**3 + coeffs['b'] * x**2 + coeffs['c'] * x + coeffs['d']
+    return coeffs['a'] * x**5 + coeffs['b'] * x**4 + coeffs['c'] * x**3 + coeffs['d'] * x**2 + coeffs['e'] * x + coeffs['f']
 
 # Wirte coefficients to file
 with open(os.path.join(output_dir, "coeffs.json"), "w") as coeff_file:
