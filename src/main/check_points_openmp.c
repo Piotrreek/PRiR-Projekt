@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <errno.h>
+#include <time.h>
 
 #define TOLERANCE 1e-3
 
@@ -73,7 +74,8 @@ int count_valid_points(const char *filename, Coeffs coeffs, int threads, int siz
     int count = 0;
 
     omp_set_num_threads(threads);
-    double start = omp_get_wtime();
+    
+    clock_t start = clock();
 
     double *xs = malloc(sizeof(double) * size);
     double *ys = malloc(sizeof(double) * size);
@@ -96,11 +98,16 @@ int count_valid_points(const char *filename, Coeffs coeffs, int threads, int siz
         }
     }
     
-    double end = omp_get_wtime();
-    printf("Threads: %d | File: %s | Matches: %d / %d | Time: %lf sec\n", threads, filename, match_count, count, end - start);
+    free(xs);
+    free(ys);
+
+    clock_t end = clock();
+    double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
+
+    printf("Threads: %d | File: %s | Matches: %d / %d | Time: %lf sec\n", threads, filename, match_count, count, time_spent);
 
     FILE *result = fopen("out/results.opm.csv", "a");
-    fprintf(result, "%d,%d,%lf\n", threads, count, end - start);
+    fprintf(result, "%d,%d,%lf\n", threads, count, time_spent);
     fclose(result);
 
     return match_count;
