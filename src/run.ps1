@@ -28,7 +28,7 @@ if (!(Test-Path $exe)) {
 }
 
 # Run with multiple thread counts
-$threadCounts = @(1, 2, 4, 8)
+$threadCounts = @(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)
 foreach ($threads in $threadCounts) {
     Write-Host "Running with $threads thread(s)..."
     & .\$exe $threads
@@ -62,18 +62,18 @@ if (!(Test-Path $exe)) {
 }
 
 # Run with multiple thread counts
-$threadCounts = @(1, 2, 4, 8)
-foreach ($threads in $threadCounts) {
-    Write-Host "Running with $threads thread(s)..."
-    & mpiexec -n $threads .\$exe
-}
+$threadCounts = @(1, 2,3, 4, 5, 6, 7, 8, 9, 10)
+# foreach ($threads in $threadCounts) {
+#     Write-Host "Running with $threads thread(s)..."
+#     & mpiexec -n $threads .\$exe
+# }
 
 # OpenMP
 Invoke-Expression "python3 plots/plot_efficiency_and_speedup.py out/results.opm.csv --prefix `"openmp_`" --label `"Number of threads`""
 Invoke-Expression "python3 plots/plot_time_thread.py out/results.opm.csv --prefix `"openmp_`" --label `"Number of threads`" --title `"OpenMP thread scaling`""
 
 # MPI
-Invoke-Expression "python3 plots/plot_efficiency_and_speedup.py out/results.mpi.csv --prefix `"mpi_`" --label `"Number of processes`""
-Invoke-Expression "python3 plots/plot_time_thread.py out/results.mpi.csv --prefix `"mpi_`" --label `"Number of processes`" --title `"MPI process scaling`""
+# Invoke-Expression "python3 plots/plot_efficiency_and_speedup.py out/results.mpi.csv --prefix `"mpi_`" --label `"Number of processes`""
+# Invoke-Expression "python3 plots/plot_time_thread.py out/results.mpi.csv --prefix `"mpi_`" --label `"Number of processes`" --title `"MPI process scaling`""
 
 Write-Host " All runs completed."
