@@ -27,3 +27,7 @@ python3 plots/plot_time_thread.py out/results.opm.csv --prefix "openmp_" --label
 # MPI
 python3 plots/plot_efficiency_and_speedup.py out/results.mpi.csv --prefix "mpi_" --label "Number of processes"
 python3 plots/plot_time_thread.py out/results.mpi.csv --prefix "mpi_" --label "Number of processes" --title "MPI process scaling"
+
+# Hybrid
+python3 plots/plot_efficiency_and_speedup.py out/results.hybrid.csv --prefix "hybrid_" --label "Number of process x threads" --hybrid
+python3 plots/plot_time_thread.py out/results.hybrid.csv --prefix "hybrid_" --label "Number of process x threads" --title "Hybrid scaling" --hybrid

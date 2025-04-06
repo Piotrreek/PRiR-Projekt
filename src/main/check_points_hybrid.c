@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <mpi.h>
+#include <omp.h>
 #include <math.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -61,7 +62,7 @@ double f(double x, Coeffs coeffs) {
     return result;
 }
 
-void process_file(const char *filename, Coeffs coeffs)
+void process_file(const char *filename, Coeffs coeffs, int num_threads)
 {
     int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -70,8 +71,6 @@ void process_file(const char *filename, Coeffs coeffs)
     int total_count = 0;
     double *all_xs = NULL;
     double *all_ys = NULL;
-
-    double start_time = MPI_Wtime();
 
     // Only root reads the file
     if (rank == 0)
@@ -87,7 +86,7 @@ void process_file(const char *filename, Coeffs coeffs)
         // Allocate temp arrays (we don't know count yet)
         double *temp_xs = malloc(sizeof(double) * 64000000);
         double *temp_ys = malloc(sizeof(double) * 64000000);
-
+        
         if (!temp_xs || !temp_ys) {
             perror("Memory allocation failed");
             MPI_Abort(MPI_COMM_WORLD, 1);
@@ -99,11 +98,11 @@ void process_file(const char *filename, Coeffs coeffs)
         {
             total_count++;
         }
-
+        
         // Allocate arrays of exact size
         all_xs = malloc(sizeof(double) * total_count);
         all_ys = malloc(sizeof(double) * total_count);
-
+        
         if (!all_xs || !all_ys) {
             perror("Memory allocation failed");
             MPI_Abort(MPI_COMM_WORLD, 1);
@@ -147,17 +146,25 @@ void process_file(const char *filename, Coeffs coeffs)
     // Synchronize all processes before timing computation
     MPI_Barrier(MPI_COMM_WORLD);
 
-    // Process local points
+    // Set number of OpenMP threads
+    omp_set_num_threads(num_threads);
+    
+    // Start timing - ONLY measuring computation time
+    double start_time = MPI_Wtime();
+
+    // Process local points with OpenMP parallelism
     int local_matches = 0;
-    for (int i = 0; i < local_count; i++)
+    
+    #pragma omp parallel reduction(+:local_matches)
     {
-        double expected;
+        #pragma omp for schedule(dynamic)
+        for (int i = 0; i < local_count; i++)
         {
-            expected = f(local_xs[i], coeffs);
-        }
-        if (fabs(expected - local_ys[i]) < TOLERANCE)
-        {
-            local_matches++;
+            double expected = f(local_xs[i], coeffs);
+            if (fabs(expected - local_ys[i]) < TOLERANCE)
+            {
+                local_matches++;
+            }
         }
     }
 
@@ -176,11 +183,11 @@ void process_file(const char *filename, Coeffs coeffs)
     // Root process handles output
     if (rank == 0)
     {
-        printf("Processes: %d | File: %s | Matches: %d / %d | Computation Time: %lf sec\n",
-               size, filename, total_matches, total_count, max_time);
+        printf("Processes: %d | Threads/Process: %d | File: %s | Matches: %d / %d | Computation Time: %lf sec\n",
+               size, num_threads, filename, total_matches, total_count, max_time);
 
-        FILE *result = fopen("out/results.mpi.csv", "a");
-        fprintf(result, "%d,%d,%lf\n", size, total_count, max_time);
+        FILE *result = fopen("out/results.hybrid.csv", "a");
+        fprintf(result, "%d,%d,%d,%lf\n", size, num_threads, total_count, max_time);
         fclose(result);
 
         // Free root's arrays
@@ -197,12 +204,37 @@ void process_file(const char *filename, Coeffs coeffs)
 
 int main(int argc, char *argv[])
 {
-    // Initialize MPI
-    MPI_Init(&argc, &argv);
+    // Initialize MPI with thread support
+    int provided;
+    MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided);
+    
+    // Check if we have the required level of thread support
+    if (provided < MPI_THREAD_FUNNELED) {
+        printf("Warning: The MPI implementation does not provide the required thread level\n");
+    }
 
     int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    // Check if thread count was provided
+    int num_threads = omp_get_max_threads(); // Default to max available threads
+    
+    if (argc > 1)
+    {
+        num_threads = atoi(argv[1]);
+        if (num_threads < 1)
+        {
+            if (rank == 0) {
+                printf("Invalid thread count: %s. Using max available threads.\n", argv[1]);
+            }
+            num_threads = omp_get_max_threads();
+        }
+    }
+    else if (rank == 0)
+    {
+        printf("No thread count specified. Using max available threads (%d).\n", num_threads);
+    }
 
     Coeffs coeffs;
 
@@ -244,8 +276,8 @@ int main(int argc, char *argv[])
             char filename[100];
             sprintf(filename, "point_lists/points_%d.txt", file_size);
 
-            // Process file with all available processes
-            process_file(filename, coeffs);
+            // Process file with all available processes and threads
+            process_file(filename, coeffs, num_threads);
 
             // Add barrier to ensure clean separation between file processing
             MPI_Barrier(MPI_COMM_WORLD);
@@ -272,8 +304,8 @@ int main(int argc, char *argv[])
             char filename[100];
             sprintf(filename, "point_lists/points_%d.txt", file_size);
 
-            // Process file with all available processes
-            process_file(filename, coeffs);
+            // Process file with all available processes and threads
+            process_file(filename, coeffs, num_threads);
 
             // Match the barrier in the root process
             MPI_Barrier(MPI_COMM_WORLD);

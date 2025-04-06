@@ -75,7 +75,7 @@ int count_valid_points(const char *filename, Coeffs coeffs, int threads, int siz
 
     omp_set_num_threads(threads);
     
-    clock_t start = clock();
+    double start = omp_get_wtime();
 
     double *xs = malloc(sizeof(double) * size);
     double *ys = malloc(sizeof(double) * size);
@@ -101,8 +101,8 @@ int count_valid_points(const char *filename, Coeffs coeffs, int threads, int siz
     free(xs);
     free(ys);
 
-    clock_t end = clock();
-    double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
+    double end = omp_get_wtime();
+    double time_spent = end - start;
 
     printf("Threads: %d | File: %s | Matches: %d / %d | Time: %lf sec\n", threads, filename, match_count, count, time_spent);
 
@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
         printf("No thread count specified. Using 1 thread.\n");
     }
 
-    FILE *coeff_file = fopen("points/point_lists/coeffs.json", "r");
+    FILE *coeff_file = fopen("point_lists/coeffs.json", "r");
     if (!coeff_file)
     {
         perror("Brak pliku coeffs.json");
@@ -143,7 +143,7 @@ int main(int argc, char *argv[])
     fscanf(coeff_file, "{ \"a\": %lf, \"b\": %lf, \"c\": %lf, \"d\": %lf, \"e\": %lf, \"f\": %lf }", &coeffs.a, &coeffs.b, &coeffs.c, &coeffs.d, &coeffs.e, &coeffs.f);
     fclose(coeff_file);
 
-    FILE *sizes_file = fopen("points/point_lists/sizes.txt", "r");
+    FILE *sizes_file = fopen("point_lists/sizes.txt", "r");
     if (!sizes_file)
     {
         perror("Brak pliku sizes.txt");
@@ -157,7 +157,7 @@ int main(int argc, char *argv[])
     while (fscanf(sizes_file, "%d", &size) == 1)
     {
         char filename[100];
-        sprintf(filename, "points/point_lists/points_%d.txt", size);
+        sprintf(filename, "point_lists/points_%d.txt", size);
 
         // Process the file with specified thread count
         count_valid_points(filename, coeffs, thread_count, size);

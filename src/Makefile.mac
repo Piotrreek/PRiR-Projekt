@@ -8,13 +8,20 @@ CC_MPI=mpicc
 CFLAGS_MPI=-O2 -Wall -I/opt/homebrew/Cellar/mpich/4.3.0/include
 LDFLAGS_MPI=-L/opt/homebrew/Cellar/mpich/4.3.0/lib -lm
 
+# Compiler settings for Hybrid MPI+OpenMP version
+CC_HYBRID=mpicc
+CFLAGS_HYBRID=-Xpreprocessor -fopenmp -O2 -Wall -I/opt/homebrew/Cellar/mpich/4.3.0/include -I/opt/homebrew/Cellar/libomp/20.1.1/include
+LDFLAGS_HYBRID=-L/opt/homebrew/Cellar/mpich/4.3.0/lib -L/opt/homebrew/Cellar/libomp/20.1.1/lib -lomp -lm
+
 TARGET_OMP=out/check_points_openmp
 TARGET_MPI=out/check_points_mpi
+TARGET_HYBRID=out/check_points_hybrid
 
 SRC_OMP=main/check_points_openmp.c
 SRC_MPI=main/check_points_mpi.c
+SRC_HYBRID=main/check_points_hybrid.c
 
-all: omp mpi
+all: omp mpi hybrid
 
 omp: $(TARGET_OMP)
 
@@ -26,25 +33,58 @@ mpi: $(TARGET_MPI)
 $(TARGET_MPI): $(SRC_MPI) | out
 	$(CC_MPI) $(CFLAGS_MPI) $^ -o $@ $(LDFLAGS_MPI)
 
+hybrid: $(TARGET_HYBRID)
+
+$(TARGET_HYBRID): $(SRC_HYBRID) | out
+	$(CC_HYBRID) $(CFLAGS_HYBRID) $^ -o $@ $(LDFLAGS_HYBRID)
+
 out:
 	mkdir -p out
 
 clean:
-	rm -f $(TARGET_OMP) $(TARGET_MPI) out/results.csv
+	rm -f $(TARGET_OMP) $(TARGET_MPI) $(TARGET_HYBRID) out/results.opm.csv out/results.mpi.csv out/results.hybrid.csv
 
 # All
-benchmark: omp mpi
-	@rm -f out/results.opm.csv out/results.mpi.csv
+benchmark: omp mpi hybrid
+	@rm -f out/results.opm.csv out/results.mpi.csv out/results.hybrid.csv
 	@echo "Running OpenMP benchmark..."
-	@for i in 1 2 4 8; do \
-		echo "  Running with $$i threads..."; \
-		./$(TARGET_OMP) $$i; \
+	@for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do \
+	   echo "  Running with $$i threads..."; \
+	   ./$(TARGET_OMP) $$i; \
 	done
 	@echo "\nRunning MPI benchmark..."
-	@for i in 1 2 4 8; do \
-		echo "  Running with $$i processes..."; \
-		mpirun -np $$i ./$(TARGET_MPI); \
+	@for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do \
+	   echo "  Running with $$i processes..."; \
+	   mpirun -np $$i ./$(TARGET_MPI); \
 	done
-	@echo "\nAll benchmarks completed. Results in out/results.opm.csv and out/results.mpi.csv"
+	@echo "\nRunning Hybrid MPI+OpenMP benchmark..."
+	@for p in 1 2 4; do \
+	   for t in 1 2 4; do \
+	      echo "  Running with $$p processes and $$t threads per process..."; \
+	      mpirun -np $$p ./$(TARGET_HYBRID) $$t; \
+	   done \
+	done
+	@echo "\nAll benchmarks completed. Results in out/results.opm.csv, out/results.mpi.csv, and out/results.hybrid.csv"
 
-.PHONY: all omp mpi clean run-omp-1 run-omp-2 run-omp-4 run-omp-8 run-omp-all run-mpi-1 run-mpi-2 run-mpi-4 run-mpi-8 run-mpi-all benchmark
+# Individual benchmark targets
+run-omp:
+	@for i in 1 2 4 8; do \
+	   echo "Running OpenMP with $$i threads..."; \
+	   ./$(TARGET_OMP) $$i; \
+	done
+
+run-mpi:
+	@for i in 1 2 4 8; do \
+	   echo "Running MPI with $$i processes..."; \
+	   mpirun -np $$i ./$(TARGET_MPI); \
+	done
+
+run-hybrid:
+	@for p in 1 2 4; do \
+	   for t in 1 2 4; do \
+	      echo "Running Hybrid with $$p processes and $$t threads per process..."; \
+	      mpirun -np $$p ./$(TARGET_HYBRID) $$t; \
+	   done \
+	done
+
+.PHONY: all omp mpi hybrid clean benchmark run-omp run-mpi run-hybrid
