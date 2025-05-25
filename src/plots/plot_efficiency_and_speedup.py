@@ -174,13 +174,6 @@ def main():
 
                 plt.plot(size_data["units"], size_data["speedup"],
                          marker='o', color=color_map[size], label=size_label_str)
-
-                # Annotate each point with its proc×thread configuration
-                for _, point in size_data.iterrows():
-                    plt.annotate(f"{point['procs']}p×{point['threads']}t",
-                                 (point["units"], point["speedup"]),
-                                 xytext=(5, 5), textcoords='offset points',
-                                 fontsize=8)
         else:
             # Standard plot for non-hybrid data
             for label in speedup_df["base_label"].unique():
@@ -218,12 +211,6 @@ def main():
                 plt.plot(size_data["units"], size_data["efficiency"],
                          marker='o', color=color_map[size], label=size_label_str)
 
-                # Annotate each point with its proc×thread configuration
-                for _, point in size_data.iterrows():
-                    plt.annotate(f"{point['procs']}p×{point['threads']}t",
-                                 (point["units"], point["efficiency"]),
-                                 xytext=(5, 5), textcoords='offset points',
-                                 fontsize=8)
         else:
             # Standard plot for non-hybrid data
             for label in efficiency_df["base_label"].unique():

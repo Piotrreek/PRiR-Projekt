@@ -1,0 +1,334 @@
+\documentclass[12pt,a4paper]{report}
+
+\usepackage[utf8]{inputenc}
+\usepackage[polish]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+
+\geometry{margin=2.5cm}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\leftmark}
+\fancyfoot[C]{\thepage}
+
+\title{Porównanie MPI, OpenMP oraz podejścia hybrydowego w programowaniu równoległym}
+\author{Piotr Gębalski, Adrian Jabłoński}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+\tableofcontents
+\newpage
+
+\chapter{Wstęp}
+
+\section{Cel sprawozdania}
+
+Niniejsze sprawozdanie ma na celu przeprowadzenie szczegółowej analizy porównawczej trzech kluczowych podejść w programowaniu równoległym: Message Passing Interface (MPI), Open Multi-Processing (OpenMP) oraz rozwiązań hybrydowych łączących obydwa paradygmaty. Głównym celem jest zbadanie wydajności zastosowania każdego z tych podejść w różnych scenariuszach obliczeniowych.
+
+Dokument prezentuje teoretyczne podstawy każdej z technologii, a następnie porównuje ich efektywność na podstawie implementacji programu do badania czy dany punkt należy do wykresu.
+
+\section{Podstawy teoretyczne}
+
+\subsection{Open Multi-Processing (OpenMP)}
+
+OpenMP to interfejs programowania aplikacji (API) dla programowania równoległego z pamięcią współdzieloną. Wykorzystuje model fork-join, w którym program rozpoczyna wykonanie jako pojedynczy wątek (master thread), a następnie tworzy zespół wątków roboczych do wykonywania równoległych sekcji kodu.
+
+Główne cechy OpenMP:
+\begin{itemize}
+    \item \textbf{Model pamięci współdzielonej} -- wszystkie wątki mają dostęp do tej samej przestrzeni adresowej
+    \item \textbf{Dyrektywy kompilatora} -- równoległość wprowadzana poprzez pragma w kodzie źródłowym
+    \item \textbf{Przyrostowe równoległenie} -- możliwość stopniowego dodawania równoległości do istniejącego kodu sekwencyjnego
+    \item \textbf{Automatyczne zarządzanie wątkami} -- środowisko wykonawcze automatycznie zarządza tworzeniem i niszczeniem wątków
+\end{itemize}
+
+\subsection{Message Passing Interface (MPI)}
+
+MPI stanowi standard komunikacji dla programowania równoległego w środowiskach rozproszonych. Opiera się na paradygmacie przekazywania komunikatów między niezależnymi procesami, które nie dzielą wspólnej pamięci. Każdy proces MPI posiada własną, prywatną przestrzeń adresową, a komunikacja odbywa się poprzez jawne wysyłanie i odbieranie wiadomości.
+
+Kluczowe charakterystyki MPI obejmują:
+\begin{itemize}
+    \item \textbf{Model SPMD} (Single Program, Multiple Data) -- ten sam program wykonuje się na różnych procesorach z różnymi danymi
+    \item \textbf{Jawną komunikację} -- programista musi explicite określić kiedy i jakie dane są przesyłane między procesami
+    \item \textbf{Skalowalność} -- możliwość efektywnego działania na tysiącach procesorów w klastrach obliczeniowych
+    \item \textbf{Przenośność} -- standard działa na różnych architekturach od wielordzeniowych stacji roboczych po superkomputery
+\end{itemize}
+
+\subsection{Podejście hybrydowe (MPI + OpenMP)}
+
+Programowanie hybrydowe łączy zalety obu paradygmatów, wykorzystując MPI do komunikacji między węzłami obliczeniowymi a OpenMP do równoległości wewnątrz każdego węzła. To podejście jest szczególnie efektywne w nowoczesnych architekturach, gdzie klastry składają się z węzłów wielordzeniowych.
+
+Zalety podejścia hybrydowego:
+\begin{itemize}
+    \item \textbf{Hierarchiczna równoległość} -- wykorzystanie struktury sprzętowej (węzły + rdzenie)
+    \item \textbf{Redukcja komunikacji} -- mniej procesów MPI oznacza mniej komunikatów między węzłami
+    \item \textbf{Efektywność pamięciowa} -- współdzielenie pamięci wewnątrz węzła przy użyciu OpenMP
+    \item \textbf{Lepsze dopasowanie do architektury} -- naturalne mapowanie na klastry wielordzeniowe
+\end{itemize}
+
+\subsection{Architektura sprzętowa a wybór technologii}
+
+Wybór odpowiedniej technologii programowania równoległego zależy w znacznej mierze od dostępnej architektury sprzętowej:
+
+\textbf{Systemy z pamięcią współdzieloną (SMP)} -- wielordzeniowe procesory w jednym węźle, gdzie OpenMP często stanowi optymalne rozwiązanie ze względu na niski koszt komunikacji i prostotę implementacji.
+
+\textbf{Klastry obliczeniowe} -- systemy rozproszone składające się z wielu niezależnych węzłów połączonych siecią, gdzie MPI jest naturalnym wyborem ze względu na brak wspólnej pamięci między węzłami.
+
+\textbf{Klastry wielordzeniowe} -- nowoczesne systemy łączące zalety obu architektur, idealne dla podejścia hybrydowego, pozwalającego na wykorzystanie współdzielonej pamięci wewnątrz węzłów i komunikacji sieciowej między nimi.
+
+\chapter{OpenMP}
+
+\section{Efektywność równoległego przetwarzania}
+
+Analiza wykresu efektywności (Rysunek 2.1) pokazuje charakterystyczny spadek efektywności wraz ze wzrostem liczby wątków. Wszystkie testowane rozmiary problemów wykazują podobne zachowanie:
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../out/openmp_efficiency.png}
+    \caption{Efektywność OpenMP}
+    \label{fig:etykieta}
+\end{figure}
+
+\begin{itemize}
+    \item Efektywność rozpoczyna się od wartości bliskiej 1.0 (100\%) dla małej liczby wątków
+    \item Następuje stopniowy spadek efektywności wraz ze wzrostem liczby wątków
+    \item Dla 16 wątków efektywność spada do około 40-45\% niezależnie od rozmiaru problemu
+    \item Krzywe dla różnych rozmiarów problemów są bardzo zbliżone, co wskazuje na podobne właściwości skalowania
+\end{itemize}
+
+Obserwowany spadek efektywności wynika z rosnących kosztów synchronizacji między wątkami oraz narzutu związanego z zarządzaniem większą liczbą jednostek wykonawczych. Zjawisko to jest typowe dla programowania równoległego i zgodne z prawem Amdahla.
+
+\section{Przyśpieszenie obliczeń}
+
+Wykres przyśpieszenia (Rysunek 2.2) ujawnia ograniczenia skalowalności OpenMP w testowanym środowisku:
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../out/openmp_speedup.png}
+    \caption{Przyśpieszenie OpenMP}
+    \label{fig:etykieta}
+\end{figure}
+
+\begin{itemize}
+    \item Maksymalne osiągnięte przyśpieszenie wynosi około 6.5-7x dla większości rozmiarów problemów
+    \item Przyśpieszenie stabilizuje się po osiągnięciu 8-10 wątków
+    \item Dalsze zwiększanie liczby wątków powyżej 10 nie przynosi istotnych korzyści
+    \item Linia reprezentująca idealne przyśpieszenie (perfect scaling) pokazuje znaczną różnicę względem osiągniętych wyników
+\end{itemize}
+
+Plateau przyśpieszenia wskazuje na osiągnięcie granicy efektywności równoległego przetwarzania w danej architekturze sprzętowej. Prawdopodobnie wynika to z ograniczeń przepustowości pamięci oraz zwiększonej rywalizacji o zasoby systemowe.
+
+\section{Czas wykonania}
+
+Wykres czasu wykonania (Rysunek 2.3) dostarcza szczegółowego obrazu wydajności dla poszczególnych rozmiarów problemów:
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../out/openmp_time_vs_units.png}
+    \caption{Przyśpieszenie OpenMP}
+    \label{fig:etykieta}
+\end{figure}
+
+\begin{itemize}
+    \item \textbf{Problem 16W}: Najdłuższy czas wykonania (około 12.3s dla 1 wątku), największy potencjał do równoległenia
+    \item \textbf{Problem 8W}: Średni czas wykonania (około 6.1s dla 1 wątku), dobra skalowalność
+    \item \textbf{Problem 4W}: Krótszy czas (około 3.1s dla 1 wątku), zauważalny spadek czasu z liczbą wątków
+    \item \textbf{Problem 2W}: Szybkie wykonanie (około 1.6s dla 1 wątku), ograniczone korzyści z równoległenia
+    \item \textbf{Problem W}: Najkrótszy czas (około 0.8s dla 1 wątku), minimalne korzyści z dodatkowych wątków
+\end{itemize}
+
+\chapter{MPI}
+\section{Efektywność równoległego przetwarzania}
+Analiza wykresu efektywności (Rysunek 3.1) pokazuje znacznie bardziej dramatyczny spadek efektywności w porównaniu do OpenMP:
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../out/mpi_efficiency.png}
+    \caption{Efektywność MPI}
+    \label{fig:mpi_efficiency}
+\end{figure}
+\begin{itemize}
+    \item Efektywność rozpoczyna się od wartości bliskiej 1.0 (100\%) dla 1-2 procesów
+    \item Następuje bardzo gwałtowny spadek efektywności już po przekroczeniu 4 procesów
+    \item Dla 16 procesów efektywność spada dramatycznie do około 15-30% w zależności od rozmiaru problemu
+    \item Problem o rozmiarze W wykazuje najgorsze właściwości skalowania, osiągając zaledwie około 16\% efektywności przy 16 procesach
+    \item Większe problemy (16W) zachowują nieco lepszą efektywność, ale nadal znacznie gorszą niż OpenMP
+\end{itemize}
+
+Obserwowany drastyczny spadek efektywności wynika z wysokich kosztów komunikacji między procesami MPI oraz narzutu związanego z przesyłaniem danych przez sieć. W przeciwieństwie do OpenMP, gdzie wątki dzielą wspólną pamięć, procesy MPI muszą jawnie komunikować się poprzez przesyłanie komunikatów.
+
+\section{Przyśpieszenie obliczeń}
+Wykres przyśpieszenia (Rysunek 3.2) ujawnia poważne ograniczenia skalowalności MPI:
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../out/mpi_speedup.png}
+    \caption{Przyśpieszenie MPI}
+    \label{fig:mpi_speedup}
+\end{figure}
+\begin{itemize}
+    \item Maksymalne osiągnięte przyśpieszenie wynosi około 5.5-6x dla większych problemów (8W, 16W)
+    \item Przyśpieszenie osiąga maksimum już przy 6-8 procesach, po czym następuje stagnacja lub nawet spadek
+    \item Problem o rozmiarze W wykazuje najgorsze przyśpieszenie, osiągając maksimum około 2.5-3x
+    \item Dalsze zwiększanie liczby procesów powyżej 8-10 skutkuje pogorszeniem wydajności
+    \item Różnica względem idealnego przyśpieszenia (perfect scaling) jest znacznie większa niż w przypadku OpenMP
+\end{itemize}
+
+Plateau przyśpieszenia występuje znacznie wcześniej niż w OpenMP, co wskazuje na dominujący wpływ kosztów komunikacji. Po przekroczeniu optymalnej liczby procesów, koszty komunikacji przewyższają korzyści z równoległego przetwarzania.
+
+\section{Czas wykonania}
+Wykres czasu wykonania (Rysunek 3.3) pokazuje różnice w wydajności dla poszczególnych rozmiarów problemów:
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../out/mpi_time_vs_units.png}
+    \caption{Czas wykonania MPI}
+    \label{fig:mpi_time}
+\end{figure}
+\begin{itemize}
+    \item \textbf{Problem 16W}: Najdłuższy czas wykonania (około 12.3s dla 1 procesu), największy spadek czasu do około 2.2s przy optymalnej liczbie procesów
+    \item \textbf{Problem 8W}: Średni czas wykonania (około 6.1s dla 1 procesu), spadek do około 1.1s przy 6-8 procesach
+    \item \textbf{Problem 4W}: Krótszy czas (około 3.1s dla 1 procesu), spadek do około 0.8s przy małej liczbie procesów
+    \item \textbf{Problem 2W}: Szybkie wykonanie (około 1.6s dla 1 procesu), spadek do około 0.4s, ale ograniczone korzyści z większej liczby procesów
+    \item \textbf{Problem W}: Najkrótszy czas (około 0.8s dla 1 procesu), minimalne korzyści z równoległenia, czas stabilizuje się na poziomie około 0.3s
+\end{itemize}
+
+Charakterystyczną cechą MPI jest wyraźnie widoczne optimum w liczbie procesów dla każdego rozmiaru problemu. Po przekroczeniu tej optymalnej wartości, czas wykonania przestaje spadać lub nawet wzrasta, co jest efektem przewagi kosztów komunikacji nad korzyściami z równoległego przetwarzania.
+
+\chapter{Hybryda}
+\section{Efektywność równoległego przetwarzania}
+Analiza wykresu efektywności (Rysunek 4.1) pokazuje znacznie lepsze właściwości skalowania modelu hybrydowego w porównaniu do czystego MPI:
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../out/hybrid_efficiency.png}
+    \caption{Efektywność Hybrid MPI+OpenMP}
+    \label{fig:hybrid_efficiency}
+\end{figure}
+\begin{itemize}
+    \item Efektywność rozpoczyna się od wartości bliskiej 1.0 (100\%) dla małej liczby jednostek równoległych
+    \item Wszystkie rozmiary problemów wykazują bardzo podobne zachowanie skalowania
+    \item Do 8 jednostek równoległych efektywność utrzymuje się na poziomie około 95-97\%
+    \item Znaczący spadek efektywności następuje dopiero po przekroczeniu 8 jednostek równoległych
+    \item Dla 16 jednostek równoległych efektywność spada do około 53-54\% dla wszystkich rozmiarów problemów
+    \item Krzywe dla różnych rozmiarów problemów są praktycznie identyczne, co wskazuje na bardzo dobrą skalowalność niezależną od rozmiaru problemu
+\end{itemize}
+
+Model hybrydowy wykazuje znacznie lepszą efektywność niż czysty MPI dzięki kombinacji komunikacji między procesami (MPI) z równoległością wątków w obrębie procesu (OpenMP). Pozwala to na zmniejszenie liczby kosztownych komunikacji międzyprocesowych.
+
+\section{Przyśpieszenie obliczeń}
+Wykres przyśpieszenia (Rysunek 4.2) demonstruje doskonałe właściwości skalowania modelu hybrydowego:
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../out/hybrid_speedup.png}
+    \caption{Przyśpieszenie Hybrid MPI+OpenMP}
+    \label{fig:hybrid_speedup}
+\end{figure}
+\begin{itemize}
+    \item Wszystkie rozmiary problemów wykazują niemal identyczne krzywe przyśpieszenia
+    \item Przyśpieszenie rośnie liniowo do około 8 jednostek równoległych, osiągając wartość około 7.8x
+    \item Dalszy wzrost jest wolniejszy, ale kontynuowany - dla 16 jednostek osiąga się około 8.5x przyśpieszenia
+    \item Brak wyraźnego plateau czy spadku wydajności, charakterystycznego dla czystego MPI
+    \item Krzywa przyśpieszenia jest znacznie bliższa idealnej linii skalowania niż w przypadku OpenMP czy MPI
+    \item Niezależność od rozmiaru problemu wskazuje na doskonałą skalowalność algorytmu
+\end{itemize}
+
+Model hybrydowy osiąga najlepsze przyśpieszenie spośród wszystkich testowanych podejść, łącząc zalety obu technologii i minimalizując ich wady.
+
+\section{Czas wykonania}
+Wykres czasu wykonania (Rysunek 4.3) potwierdza skuteczność modelu hybrydowego dla wszystkich rozmiarów problemów:
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../out/hybrid_time_vs_units_hybrid.png}
+    \caption{Czas wykonania Hybrid MPI+OpenMP}
+    \label{fig:hybrid_time}
+\end{figure}
+\begin{itemize}
+    \item \textbf{Problem 16W}: Najdłuższy czas wykonania (około 12.0s dla 1 jednostki), konsekwentny spadek do około 1.4s przy 16 jednostkach równoległych
+    \item \textbf{Problem 8W}: Średni czas wykonania (około 6.0s dla 1 jednostki), spadek do około 0.7s przy maksymalnej równoległości
+    \item \textbf{Problem 4W}: Krótszy czas (około 3.0s dla 1 jednostki), spadek do około 0.35s
+    \item \textbf{Problem 2W}: Szybkie wykonanie (około 1.5s dla 1 jednostki), spadek do około 0.18s
+    \item \textbf{Problem W}: Najkrótszy czas (około 0.75s dla 1 jednostki), spadek do około 0.09s przy pełnej równoległości
+\end{itemize}
+
+Charakterystyczną cechą modelu hybrydowego jest brak wyraźnego optimum - czas wykonania konsekwentnie spada wraz ze wzrostem liczby jednostek równoległych. Wszystkie rozmiary problemów wykazują podobne względne przyśpieszenie, co potwierdza doskonałą skalowalność tej architektury.
+
+Linie reprezentujące czas wykonania mają gładki, monotoniczny charakter spadkowy, bez załamań czy plateau charakterystycznych dla czystego MPI, co wskazuje na optymalną kombinację obu technologii równoległego przetwarzania.
+
+\chapter{Porównanie}
+
+Bezpośrednie porównanie trzech technologii równoległego przetwarzania dla największego testowanego problemu (16W) ujawnia wyraźne różnice w charakterystykach wydajnościowych każdego podejścia.
+
+\section{Analiza efektywności}
+
+Wykres porównania efektywności (Rysunek 5.1) pokazuje hierarchię wydajności analizowanych technologii:
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../out/efficiency_16W.png}
+    \caption{Porównanie efektywności dla problemu 16W}
+    \label{fig:comparison_efficiency}
+\end{figure}
+
+\textbf{Model hybrydowy} wykazuje zdecydowanie najlepszą efektywność w całym zakresie testowanych jednostek przetwarzania. Utrzymuje efektywność powyżej 95\% do 8 jednostek, a nawet przy 16 jednostkach osiąga około 53\% efektywności.
+
+\textbf{OpenMP} zajmuje pozycję pośrednią, rozpoczynając od doskonałej efektywności, ale wykazując stopniowy spadek. Przy 8 jednostkach osiąga około 78\% efektywności, a przy 16 jednostkach spada do około 41\%.
+
+\textbf{MPI} wykazuje najgorsze właściwości skalowania z dramatycznym spadkiem efektywności już po 4 procesach. Przy 8 procesach efektywność wynosi tylko około 75\%, a przy 16 procesach spada do zaledwie 35\%.
+
+\section{Analiza przyśpieszenia}
+
+Porównanie przyśpieszenia (Rysunek 5.2) potwierdza przewagę modelu hybrydowego:
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../out/speedup_16W.png}
+    \caption{Porównanie przyśpieszenia dla problemu 16W}
+    \label{fig:comparison_speedup}
+\end{figure}
+
+\textbf{Model hybrydowy} osiąga najlepsze wyniki z konsekwentnie rosnącym przyśpieszeniem, które osiąga wartość około 8.5x przy 16 jednostkach. Krzywa wykazuje najbardziej liniowy charakter, zbliżony do idealnej skalowalności.
+
+\textbf{OpenMP} osiąga maksymalne przyśpieszenie około 6.5x przy 8-12 wątkach, po czym stabilizuje się na tym poziomie. Plateau wskazuje na osiągnięcie granicy wydajności architektury.
+
+\textbf{MPI} wykazuje najgorsze przyśpieszenie z wyraźnym maksimum około 6x przy 8 procesach, po czym następuje stagnacja lub nawet lekki spadek wydajności.
+
+\section{Analiza czasu wykonania}
+
+Wykres czasu wykonania (Rysunek 5.3) przedstawia praktyczne implikacje różnic w wydajności:
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../out/time_16W.png}
+    \caption{Porównanie czasu wykonania dla problemu 16W}
+    \label{fig:comparison_time}
+\end{figure}
+
+Wszystkie technologie rozpoczynają od podobnego czasu wykonania sekwencyjnego (około 12.3s), ale różnią się znacząco w zakresie redukcji czasu:
+
+\textbf{Model hybrydowy} osiąga najkrótszy czas wykonania przy maksymalnej równoległości (około 1.4s przy 16 jednostkach), wykazując konsekwentny spadek bez plateau.
+
+\textbf{OpenMP} osiąga czas około 1.8s przy optymalnej konfiguracji (8-12 wątków), z niewielkimi korzyściami z dalszego zwiększania liczby wątków.
+
+\textbf{MPI} stabilizuje się na poziomie około 2.2s przy 8-10 procesach, wykazując wyraźne optimum i brak korzyści z większej liczby procesów.
+
+\section{Wnioski}
+
+Analiza porównawcza jednoznacznie wskazuje na przewagę \textbf{modelu hybrydowego MPI+OpenMP}, który łączy zalety obu technologii:
+\begin{itemize}
+    \item Najlepsza efektywność i skalowalność w całym zakresie jednostek przetwarzania
+    \item Brak wyraźnego plateau wydajności charakterystycznego dla innych podejść
+    \item Konsekwentne skracanie czasu wykonania wraz ze wzrostem równoległości
+\end{itemize}
+
+\textbf{OpenMP} stanowi dobre rozwiązanie dla systemów wielordzeniowych z współdzieloną pamięcią, oferując prostotę implementacji przy zadowalającej wydajności.
+
+\textbf{MPI} wykazuje największe ograniczenia skalowalności ze względu na koszty komunikacji, ale pozostaje niezbędny dla systemów rozproszonych i klastrów obliczeniowych.
+
+
+\end{document}

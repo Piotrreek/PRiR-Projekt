@@ -107,9 +107,6 @@ def main():
                 for _, row in subset.iterrows():
                     config_label = f"{row['procs']}p×{row['threads']}t"
                     plt.scatter(row["units"], row["time"], alpha=0.6, s=40)
-                    plt.annotate(config_label, (row["units"], row["time"]),
-                                 xytext=(5, 5), textcoords="offset points",
-                                 fontsize=8, alpha=0.7)
 
         else:
             # Standard processing for non-hybrid data

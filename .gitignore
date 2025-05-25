@@ -12,3 +12,10 @@ out/
 
 MS_MPI/
 lab2/
+
+# Latex
+src/latex/*.aux
+src/latex/*.log
+src/latex/*.out
+src/latex/*.toc
+src/latex/*.gz
