@@ -51,6 +51,21 @@ Główne cechy OpenMP:
     \item \textbf{Automatyczne zarządzanie wątkami} -- środowisko wykonawcze automatycznie zarządza tworzeniem i niszczeniem wątków
 \end{itemize}
 
+\subsubsection{Paralelizacja pętli głównej z OpenMP}
+
+Kluczowym elementem implementacji jest zastosowanie dyrektywy OpenMP do równoległego przetwarzania głównej pętli obliczeniowej:
+
+\begin{verbatim}
+#pragma omp parallel for reduction(+ : match_count) schedule(dynamic)
+for (int i = 0; i < count; i++){
+   double expected = f(xs[i], coeffs);
+   if (fabs(expected - ys[i]) < TOLERANCE)
+   {
+       match_count++;
+   }
+}
+\end{verbatim}
+
 \subsection{Message Passing Interface (MPI)}
 
 MPI stanowi standard komunikacji dla programowania równoległego w środowiskach rozproszonych. Opiera się na paradygmacie przekazywania komunikatów między niezależnymi procesami, które nie dzielą wspólnej pamięci. Każdy proces MPI posiada własną, prywatną przestrzeń adresową, a komunikacja odbywa się poprzez jawne wysyłanie i odbieranie wiadomości.
@@ -63,6 +78,39 @@ Kluczowe charakterystyki MPI obejmują:
     \item \textbf{Przenośność} -- standard działa na różnych architekturach od wielordzeniowych stacji roboczych po superkomputery
 \end{itemize}
 
+\subsection{Podział danych i komunikacja w MPI}
+
+Kluczowym elementem implementacji MPI jest podział danych między procesy oraz ich synchronizacja (podany kod nie jest całym spójnym kodem, a tylko pociętym fragmentem):
+
+\begin{verbatim}
+// Broadcast total count to all processes
+MPI_Bcast(&total_count, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+// Calculate local counts and displacements
+int points_per_proc = total_count / size;
+int remainder = total_count % size;
+
+[...]
+
+// Scatter the points
+MPI_Scatterv(all_xs, counts, displs, MPI_DOUBLE, local_xs, 
+            local_count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+MPI_Scatterv(all_ys, counts, displs, MPI_DOUBLE, local_ys, 
+            local_count, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+// Process local points
+for (int i = 0; i < local_count; i++) {
+   double expected = f(local_xs[i], coeffs);
+   if (fabs(expected - local_ys[i]) < TOLERANCE) {
+       local_matches++;
+   }
+}
+
+// Reduce the match count
+MPI_Reduce(&local_matches, &total_matches, 1, MPI_INT, 
+          MPI_SUM, 0, MPI_COMM_WORLD);
+\end{verbatim}
+
 \subsection{Podejście hybrydowe (MPI + OpenMP)}
 
 Programowanie hybrydowe łączy zalety obu paradygmatów, wykorzystując MPI do komunikacji między węzłami obliczeniowymi a OpenMP do równoległości wewnątrz każdego węzła. To podejście jest szczególnie efektywne w nowoczesnych architekturach, gdzie klastry składają się z węzłów wielordzeniowych.
@@ -74,6 +122,41 @@ Zalety podejścia hybrydowego:
     \item \textbf{Efektywność pamięciowa} -- współdzielenie pamięci wewnątrz węzła przy użyciu OpenMP
     \item \textbf{Lepsze dopasowanie do architektury} -- naturalne mapowanie na klastry wielordzeniowe
 \end{itemize}
+
+\subsection{Hybrydowa paralelizacja MPI + OpenMP}
+
+W implementacji hybrydowej zastosowano kombinację MPI do komunikacji między procesami oraz OpenMP do paralelizacji wewnątrz każdego procesu (podany kod nie jest całym spójnym kodem, a tylko pociętym fragmentem):
+
+\begin{verbatim}
+// Initialize MPI with thread support
+int provided;
+MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided);
+
+[...]
+
+// Set number of OpenMP threads
+omp_set_num_threads(num_threads);
+
+// Process local points with OpenMP parallelism
+int local_matches = 0;
+
+#pragma omp parallel reduction(+:local_matches)
+{
+   #pragma omp for schedule(dynamic)
+   for (int i = 0; i < local_count; i++)
+   {
+       double expected = f(local_xs[i], coeffs);
+       if (fabs(expected - local_ys[i]) < TOLERANCE)
+       {
+           local_matches++;
+       }
+   }
+}
+
+// Reduce the match count across all MPI processes
+MPI_Reduce(&local_matches, &total_matches, 1, MPI_INT, 
+          MPI_SUM, 0, MPI_COMM_WORLD);
+\end{verbatim}
 
 \subsection{Architektura sprzętowa a wybór technologii}
 
@@ -203,62 +286,75 @@ Charakterystyczną cechą MPI jest wyraźnie widoczne optimum w liczbie procesó
 
 \chapter{Hybryda}
 \section{Efektywność równoległego przetwarzania}
-Analiza wykresu efektywności (Rysunek 4.1) pokazuje znacznie lepsze właściwości skalowania modelu hybrydowego w porównaniu do czystego MPI:
+Dla modelu hybrydowego zastosowaliśmy ilość punktów 100000 (W) oraz 1600000 (16W), ponieważ wykresy bardzo na siebie nachodziły na jednym wykresie. Analiza wykresu efektywności (Rysunek 4.1 oraz Rysunek 4.2) pokazuje znacznie lepsze właściwości skalowania modelu hybrydowego w porównaniu do czystego MPI oraz OpenMP:
 \begin{figure}[h]
     \centering
     \includegraphics[width=0.8\textwidth]{../out/hybrid_efficiency.png}
-    \caption{Efektywność Hybrid MPI+OpenMP}
+    \caption{Efektywność Hybrid MPI+OpenMP (W)}
     \label{fig:hybrid_efficiency}
+\end{figure}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../out/hybrid_efficiency_16w.png}
+    \caption{Efektywność Hybrid MPI+OpenMP (16W)}
+    \label{fig:hybrid_efficiency_16w}
 \end{figure}
 \begin{itemize}
     \item Efektywność rozpoczyna się od wartości bliskiej 1.0 (100\%) dla małej liczby jednostek równoległych
-    \item Wszystkie rozmiary problemów wykazują bardzo podobne zachowanie skalowania
+    \item Dla obydwu rozmiarów problemów wykazują bardzo podobne zachowanie skalowania
     \item Do 8 jednostek równoległych efektywność utrzymuje się na poziomie około 95-97\%
     \item Znaczący spadek efektywności następuje dopiero po przekroczeniu 8 jednostek równoległych
-    \item Dla 16 jednostek równoległych efektywność spada do około 53-54\% dla wszystkich rozmiarów problemów
-    \item Krzywe dla różnych rozmiarów problemów są praktycznie identyczne, co wskazuje na bardzo dobrą skalowalność niezależną od rozmiaru problemu
+    \item Dla 16 jednostek równoległych efektywność spada do około 53-54\% dla obu rozmiarów
+    \item Krzywe obydwu rozmiarów problemów są praktycznie identyczne, co wskazuje na bardzo dobrą skalowalność niezależną od rozmiaru problemu
 \end{itemize}
 
 Model hybrydowy wykazuje znacznie lepszą efektywność niż czysty MPI dzięki kombinacji komunikacji między procesami (MPI) z równoległością wątków w obrębie procesu (OpenMP). Pozwala to na zmniejszenie liczby kosztownych komunikacji międzyprocesowych.
 
 \section{Przyśpieszenie obliczeń}
-Wykres przyśpieszenia (Rysunek 4.2) demonstruje doskonałe właściwości skalowania modelu hybrydowego:
+Wykres przyśpieszenia (Rysunek 4.3 oraz Rysunek 4.4) demonstruje doskonałe właściwości skalowania modelu hybrydowego:
 \begin{figure}[h]
     \centering
     \includegraphics[width=0.8\textwidth]{../out/hybrid_speedup.png}
     \caption{Przyśpieszenie Hybrid MPI+OpenMP}
     \label{fig:hybrid_speedup}
 \end{figure}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../out/hybrid_speedup_16w.png}
+    \caption{Przyśpieszenie Hybrid MPI+OpenMP (16W)}
+    \label{fig:hybrid_speedup_16w}
+\end{figure}
 \begin{itemize}
-    \item Wszystkie rozmiary problemów wykazują niemal identyczne krzywe przyśpieszenia
+    \item Obydwa rozmiary problemów wykazują niemal identyczne krzywe przyśpieszenia
     \item Przyśpieszenie rośnie liniowo do około 8 jednostek równoległych, osiągając wartość około 7.8x
     \item Dalszy wzrost jest wolniejszy, ale kontynuowany - dla 16 jednostek osiąga się około 8.5x przyśpieszenia
     \item Brak wyraźnego plateau czy spadku wydajności, charakterystycznego dla czystego MPI
     \item Krzywa przyśpieszenia jest znacznie bliższa idealnej linii skalowania niż w przypadku OpenMP czy MPI
-    \item Niezależność od rozmiaru problemu wskazuje na doskonałą skalowalność algorytmu
+    \item Niezależność od rozmiaru problemu wskazuje na dobrą skalowalność
 \end{itemize}
 
 Model hybrydowy osiąga najlepsze przyśpieszenie spośród wszystkich testowanych podejść, łącząc zalety obu technologii i minimalizując ich wady.
 
 \section{Czas wykonania}
-Wykres czasu wykonania (Rysunek 4.3) potwierdza skuteczność modelu hybrydowego dla wszystkich rozmiarów problemów:
+Wykres czasu wykonania (Rysunek 4.5 oraz Rysunek 4.6) potwierdza skuteczność modelu hybrydowego dla wszystkich rozmiarów problemów:
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.8\textwidth]{../out/hybrid_time_vs_units_hybrid.png}
-    \caption{Czas wykonania Hybrid MPI+OpenMP}
+    \includegraphics[width=0.7\textwidth]{../out/hybrid_time_vs_units_hybrid.png}
+    \caption{Czas wykonania Hybrid MPI+OpenMP (W)}
     \label{fig:hybrid_time}
 \end{figure}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.7\textwidth]{../out/hybrid_time_vs_units_hybrid_16w.png}
+    \caption{Czas wykonania Hybrid MPI+OpenMP (16W)}
+    \label{fig:hybrid_time_16w}
+\end{figure}
 \begin{itemize}
-    \item \textbf{Problem 16W}: Najdłuższy czas wykonania (około 12.0s dla 1 jednostki), konsekwentny spadek do około 1.4s przy 16 jednostkach równoległych
-    \item \textbf{Problem 8W}: Średni czas wykonania (około 6.0s dla 1 jednostki), spadek do około 0.7s przy maksymalnej równoległości
-    \item \textbf{Problem 4W}: Krótszy czas (około 3.0s dla 1 jednostki), spadek do około 0.35s
-    \item \textbf{Problem 2W}: Szybkie wykonanie (około 1.5s dla 1 jednostki), spadek do około 0.18s
-    \item \textbf{Problem W}: Najkrótszy czas (około 0.75s dla 1 jednostki), spadek do około 0.09s przy pełnej równoległości
+    \item \textbf{Problem W}: Krótszy czas (około 0.75s dla 1 jednostki), spadek do około 0.09s przy pełnej równoległości
+    \item \textbf{Problem 16W}: Naturalnie dłuższy czas wykonania od W (około 12.0s dla 1 jednostki), konsekwentny spadek do około 1.4s przy 16 jednostkach równoległych
 \end{itemize}
 
 Charakterystyczną cechą modelu hybrydowego jest brak wyraźnego optimum - czas wykonania konsekwentnie spada wraz ze wzrostem liczby jednostek równoległych. Wszystkie rozmiary problemów wykazują podobne względne przyśpieszenie, co potwierdza doskonałą skalowalność tej architektury.
-
-Linie reprezentujące czas wykonania mają gładki, monotoniczny charakter spadkowy, bez załamań czy plateau charakterystycznych dla czystego MPI, co wskazuje na optymalną kombinację obu technologii równoległego przetwarzania.
 
 \chapter{Porównanie}
 
